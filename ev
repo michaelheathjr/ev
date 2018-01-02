@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+
+#
+# Easy VVV - A super simple VVV Site Setup Script
+# By Michael Heath <michael@1903studios.com>
+#
+# Big thanks to:
+# By Brad Parbs <brad@bradparbs.com> (orginal VV creator)
+# and
+# Originally by Alison Barrett <alison@barre.tt>
+#
+# Version 1.01
+#
+# Varying Vagrant Vagrants (https://github.com/Varying-Vagrant-Vagrants/VVV).
+#
+# ░░████████    ██    ██
+#	░░██         ░██   ░██ 	  ▓▓▓▓▓▓▓▓▓▓
+#	░░███████    ░░██ ░██ 	 ░▓ author ▓ Michael Heath <michael@1903studios.com>
+#	░░██          ░░████     ░▓ github ▓ http://github.com/michaelheathjr/ev
+#	░░████████     ░░██      ░▓▓▓▓▓▓▓▓▓▓
+#	                  	      ░░░░░░░░░░
+#
+# This script automates the creation & deletion of new WordPress sites using
+# Varying Vagrant Vagrants (https://github.com/Varying-Vagrant-Vagrants/VVV).
+#
+# Copyright (C) 2018 Michael Heath
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.1.6.0
+#
+
+# TODO
+# - dynamically find path instead of using ~/vagrant-local
+# - allow to be used child directories
+# - delete sites
+# - list sites
+# - no wp site setup
+# - wp-multi-site setup
+# - Add multiple sites at once
+
+echo "Starting Easy VVV"
+
+__ev__help() {
+	cat <<HELP
+    ev [--help|-h] [--version] [--about] [--path|-p <path>] [--force-path|-fp] <command> [<site-options>] ...
+HELP
+}
+
+__ev__about() {
+	cat <<ABOUT
+    Easy Vagrant makes it super easy to create local WordPress and PHP developement sites with Vagrant
+ABOUT
+}
+
+__ev__create() {
+	echo "Answer the following questions to create a new site"
+	read -e -r -p "Site Name:" site_name
+	read -e -r -p "Domain (leave blank for .test):" domain
+	read -e -r -p "Repo (leave blank for basic):" repo
+
+	if [ -z $domain]; then 
+		domain="test"
+	fi
+
+	if [ -z $repo]; then 
+		repo="https://github.com/Varying-Vagrant-Vagrants/custom-site-template.git"
+	fi
+
+	# If vvv-custom.yml is not present, create it from vvv-confing.yml
+	if [[ ! -f vvv-custom.yml ]]; then
+	  cp vvv-config.yml vvv-custom.yml
+	  echo "Created a vvv-custom.yml file from vvv-config.yml"
+	fi
+
+	# Make a backup of vvv-custom.yml
+	cp vvv-custom.yml vvv-custom.backup
+	echo "Backed up vvv-custom.yml to vvv-custom.backup"
+
+	# Add New Site to vvv-custom.yml
+	awk -v site_name="$site_name" -v domain="$domain" '1;/\sites:/{ 
+	  print "  "site_name":";
+	  print "\    repo: "repo;
+	  print "\    hosts:";
+	  print "\      - "site_name"."domain;
+	  print "\ ";
+  }' vvv-custom.yml > vvv-custom.tmp
+
+  mv vvv-custom.tmp vvv-custom.yml
+  echo "Added site to vvv-custom.yml"
+
+  # Create site folder
+  cd "www"
+  mkdir "$site_name"
+  echo "Created site directory"
+
+  # Create provision folder
+  cd "$site_name"
+  mkdir "provision"
+  echo "Created provision folder"
+
+  # Create vvv-init.sh
+  cd "provision"
+  cp ~/vagrant-local/ev-defaults/default-vvv-init.sh vvv-init.sh
+  echo "Created vvv-init.sh"
+
+  # Create vvv-nginx.conf
+  cp ~/vagrant-local/ev-defaults/default-vvv-nginx.conf vvv-nginx.conf
+  echo "Created vvv-nginx.conf"
+
+  vagrant reload --provision
+
+}
+
+__ev__remove_site() {
+	read -e -r -p "Site to remove (without the TLD):" site_name
+
+	# Remove local
+	rm -r "/www/"site_name
+
+	# Remove from vvv-custom.yml
+
+	# Remove from /etc/nginx/custom-sites
+}
+
+__ev__parse_args() {
+	if [[ $1 == "help" ]] || [[ $1 == "h" ]] || [[ $1 == "--help" ]] || [[ $1 == "--h" ]]; then
+	 	__ev__help
+	fi
+	if [[ $1 == "about" ]] || [[ $1 == "--about" ]]; then
+	 	__ev__about
+	fi
+  if [[ $1 == "create" ]]; then
+  	__ev__create
+  fi
+  if [ ! -z "$remove" ]; then
+  	__ev__remove_site
+  fi
+  # if [ ! -z "$list" ]; then
+  #  	__ev__list_sites
+  # fi
+}
+
+__ev__main() {
+	__ev__parse_args "$@"
+}
+
+if [[ "${BASH_SOURCE[0]}" = "${0}" ]]; then
+	__ev__main "$@"
+fi
