@@ -44,7 +44,6 @@
 # - dynamically find path instead of using ~/vagrant-local
 # - allow to be used child directories
 # - delete sites
-# - list sites
 # - no wp site setup
 # - wp-multi-site setup
 # - Add multiple sites at once
@@ -59,7 +58,7 @@ HELP
 
 __ev__about() {
 	cat <<ABOUT
-    Easy Vagrant makes it super easy to create local WordPress and PHP developement sites with Vagrant
+    Easy VVV makes it super easy to create local WordPress and PHP developement sites with Vagrant
 ABOUT
 }
 
@@ -93,7 +92,6 @@ __ev__create() {
 	  print "\    repo: "repo;
 	  print "\    hosts:";
 	  print "\      - "site_name"."domain;
-	  print "\ ";
   }' vvv-custom.yml > vvv-custom.tmp
 
   mv vvv-custom.tmp vvv-custom.yml
@@ -130,7 +128,21 @@ __ev__remove_site() {
 
 	# Remove from vvv-custom.yml
 
+
 	# Remove from /etc/nginx/custom-sites
+}
+
+__ev__list_sites() {
+	__ev__clean_up
+	echo $(grep -c "hosts:" vvv-custom.yml)" sites found"
+	echo "Site List:"
+	awk '/hosts:/{getline;print;}' vvv-custom.yml | sort
+}
+
+__ev__clean_up() {
+	echo "Cleaning up vvv-custom.yml"
+	sed -e '/\s*#.*$/d' -e '/^\s*$/d' vvv-custom.yml > vvv-custom-clean.tmp
+	mv vvv-custom-clean.tmp vvv-custom.yml
 }
 
 __ev__parse_args() {
@@ -143,12 +155,15 @@ __ev__parse_args() {
   if [[ $1 == "create" ]]; then
   	__ev__create
   fi
-  if [ ! -z "$remove" ]; then
+  if [[ $1 == "remove" ]]; then
   	__ev__remove_site
   fi
-  # if [ ! -z "$list" ]; then
-  #  	__ev__list_sites
-  # fi
+  if [[ $1 == "list" ]]; then
+   	__ev__list_sites
+  fi
+  if [[ $1 == "clean" ]]; then
+   	__ev__clean_up
+  fi
 }
 
 __ev__main() {
