@@ -281,11 +281,11 @@ __ev__create_site() {
 	__ev__prompt "Repo (leave blank for basic)"
 	read -r repo
 
-	if [ -z $domain]; then 
+	if [ -z $domain ]; then 
 		domain="test"
 	fi
 
-	if [ -z $repo]; then 
+	if [ -z $repo ]; then 
 		repo="https://github.com/Varying-Vagrant-Vagrants/custom-site-template.git"
 	fi
 
