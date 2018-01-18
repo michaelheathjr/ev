@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 
 #
-# Easy VVV - A super simple VVV Site Setup Script
+# Easy vvv - A super simple vvv Site Setup Script
 # By Michael Heath <michael@1903studios.com>
 #
 # Big thanks to:
-# By Brad Parbs <brad@bradparbs.com> (orginal VV creator)
+# By Brad Parbs <brad@bradparbs.com> (orginal ev creator)
 # and
 # Originally by Alison Barrett <alison@barre.tt>
 #
 # Version 1.01
 #
-# Varying Vagrant Vagrants (https://github.com/Varying-Vagrant-Vagrants/VVV).
+# Varying Vagrant Vagrants (https://github.com/Varying-Vagrant-Vagrants/vvv).
 #
 # ░░████████    ██    ██
 #	░░██         ░██   ░██ 	  ▓▓▓▓▓▓▓▓▓▓
@@ -21,7 +21,7 @@
 #	                  	      ░░░░░░░░░░
 #
 # This script automates the creation & deletion of new WordPress sites using
-# Varying Vagrant Vagrants (https://github.com/Varying-Vagrant-Vagrants/VVV).
+# Varying Vagrant Vagrants (https://github.com/Varying-Vagrant-Vagrants/vvv).
 #
 # Copyright (C) 2018 Michael Heath
 #
@@ -41,32 +41,245 @@
 #
 
 # TODO
-# - dynamically find path instead of using ~/vagrant-local
 # - allow to be used child directories
-# - delete sites
 # - no wp site setup
 # - wp-multi-site setup
 # - Add multiple sites at once
+# - Allow directory to be forced
+# - Add arguments to site creation
+# - --debug-ev 			            Outputs all debugging info needed for bug reporting
+# --force-path, -fp 		      Override ev auto-VVV locating
+# --force-sites-folder, -fsf 	Override sites folder directory locating
+# --use_defaults		          Accept all default options and skip the wizard
+# make listing sites show if it's in vvv-custom.yml (green if good red if not)
+# make command to backup custom-vvv.yml yourself
 
-echo "Starting Easy VVV"
+version_number=1.01
+
+# If we have tput, let's set our colors
+if [[ ! -z $(which tput 2>/dev/null) ]]; then
+	normal=$(tput sgr0)
+	bold=$(tput bold)
+	red=$(tput setaf 1)
+	green=$(tput setaf 2)
+	yellow=$(tput setaf 3)
+	magenta=$(tput setaf 5)
+	cyan=$(tput setaf 6)
+fi
+
+# Usage: __ev__info "message"
+# Example: __ev__info "doing thing"
+# Output (to STDOUT): doing thing
+__ev__info() {
+	__ev__hook "pre_info_output"
+	printf "%b" "${bold}${yellow}$1${normal} \n"
+	__ev__hook "post_info_output"
+}
+
+# Usage: __ev__success "message"
+# Example: __ev__success "It's Working"
+# Output (to STDOUT): [...] It's Working
+__ev__success() {
+	__ev__hook "pre_success_output"
+	printf "%b" "[${green}Success${normal}]${green} $1 ${normal}\n"
+	__ev__hook "post_success_output"
+}
+
+# Usage: __ev__warning "message"
+# Example: __ev__warning "some warning"
+# Output (to STDOUT): [...] some warning
+__ev__warning() {
+	__ev__hook "pre_warning_output"
+	printf "%b" "${red} $1 ${normal}\n"
+	__ev__hook "post_warning_output"
+}
+
+# Usage: __ev__prompt "question"
+# Example: __ev__prompt "Site name"
+# Output (to STDOUT): Site Name:
+__ev__prompt() {
+	__ev__hook "pre_prompt_output"
+	printf "%b" "${magenta} $1: ${normal}"
+	__ev__hook "post_prompt_output"
+}
+
+# Usage: __ev__error "message"
+# Example: __ev__error "this is an error"
+# Output (to STDERR): [ERROR] this is an error
+__ev__error() {
+	__ev__hook "pre_error_output"
+    printf "%b" "[${bold}${red}Error${normal}]${bold}${red} ${1:-'Unknown Error'}${normal}\n" >&2
+    __ev__hook "post_error_output"
+}
+
+# Usage: __ev__fail "message"
+# Example: __ev__fail "Unknown Option"
+__ev__fail() {
+	__ev__error "$1"
+	__ev__hook "fail_and_exit"
+	exit 1
+}
 
 __ev__help() {
-	cat <<HELP
-    ev [--help|-h] [--version] [--about] [--path|-p <path>] [--force-path|-fp] <command> [<site-options>] ...
+  __ev__hook "pre_help_output"
+  cat <<HELP
+  ${bold} USAGE: ${normal}
+      ev [--help|-h] [--version] [--about] [--path|-p <path>] [--force-path|-fp] <command> [<site-options>] ...
+  ${bold} OPTIONS: ${normal}
+      --help, -h                  Show this help and usage
+      --version, -v               Show current ev version
+      --about                     Show project info
+      --path, -p                  Path to VVV installation
+  ${bold} COMMANDS: ${normal}
+      list                        List all VVV sites
+      create                      Create a new site
+      remove                      Remove a site
+      vagrant, v                  Pass vagrant command through to VVV
+  ${bold} SITE OPTIONS: ${normal}
+      --domain, -d                Domain of new site
+      --name, -n                  Desired name for the site directory (e.g. mysite)
+      --wp-version, -wv           Version of WordPress to install
+      --debug, -x                 Turn on WP_DEBUG and WP_DEBUG_LOG
+      --multisite, -m             Install as a multisite
+      --sample-content, -sc       Add sample content to site
+      --username                  Admin username
+      --password                  Admin password
+      --email                     Admin email
+      --prefix                    Database prefix to use
+      --git-repo, -gr             Git repo to clone as wp-content
+      --blank                     Creates blank VVV site, with no WordPress
+      --blank-with-db             Adds a blank VVV site, with a database
+      --database, -db             Import a local database file
+      --remove-defaults, -rd      Remove default themes and plugins
+      --language,--locale,        Install WP in another locale.
+  ${bold} EXAMPLE:${normal}
+      ev create --domain mysite.dev --name mysite --debug
+      ev create -d mysite.dev -n mysite -x
 HELP
+    __ev__hook "post_help_output"
 }
 
 __ev__about() {
 	cat <<ABOUT
-    Easy VVV makes it super easy to create local WordPress and PHP developement sites with Vagrant
+	${green}
+	░░████████    ██    ██
+	░░██         ░██   ░██     ▓▓▓▓▓▓▓▓▓▓
+	░░███████    ░░██ ░██     ░▓ author ▓ Michael Heath <michael@1903studios.com>
+	░░██          ░░████      ░▓ github ▓ http://github.com/michaelheathjr/ev
+	░░████████     ░░██       ░▓▓▓▓▓▓▓▓▓▓
+	                          ░░░░░░░░░░
+	Easy VVV
+	==============================================================================
+	Easy VVV makes it super easy to create local WordPress and PHP developement sites with VVV
+	${normal}
 ABOUT
 }
 
-__ev__create() {
-	echo "Answer the following questions to create a new site"
-	read -e -r -p "Site Name:" site_name
-	read -e -r -p "Domain (leave blank for .test):" domain
-	read -e -r -p "Repo (leave blank for basic):" repo
+__ev__version() {
+	__ev__hook "pre_version_output"
+	echo "ev version $version_number"
+	__ev__hook "post_version_output"
+}
+
+__ev__argument_expected() {
+	__ev__hook "pre_arg_expected"
+  if [ -z "$2" ] || [[ "$2" == -* ]]; then
+  	__ev__hook "error_no_arg_$1"
+      __ev__fail "$1 expected an argument"
+  fi
+  __ev__hook "post_arg_expected"
+}
+
+__ev__get_vvv_path() {
+	current_dir=$(pwd)
+	# Look in common directories first
+	if [ -e "$current_dir/Vagrantfile" ]; then
+		path=$(pwd)
+	elif [ -e "$home"/Sites/Vagrantfile ]; then
+		path="$home"/Sites
+	elif [ -e "$home"/Sites/Vagrant/Vagrantfile ]; then
+		path="$home"/Sites/Vagrant
+	elif [ -e "$home"/vagrant/Vagrantfile ]; then
+		path="$home"/vagrant
+	elif [ -e "$home"/vagrant-local/Vagrantfile ]; then
+		path="$home"/vagrant-local
+	elif [ -e "$home"/projects/vvv/Vagrantfile ]; then
+		path="$home"/projects/vvv
+	elif [ -e "$home"/working/vvv/Vagrantfile ]; then
+		path="$home"/working/vvv
+	elif [ -e "$home"/vvv/Vagrantfile ]; then
+		path="$home"/vvv
+	fi
+
+	# Ask for directory if cannot find
+	if [ -z "$path" ]; then
+		echo "Unable to automatically find vvv directory"
+		read -e -r -p "What directory is vvv installed in?:" path
+
+		# Make sure directory is actually a vvv root
+		if [ ! -e "$(eval echo "${path//>}")/Vagrantfile" ]; then
+		echo "Path specified is not a vvv root directory. Where is vvv installed?"
+			unset path
+		fi
+	fi
+	path=${path%/}
+}
+
+__ev__hook() {
+	# Display all hooks to screen if the show_hooks flag is set
+	if [[ $show_hooks = 'true' ]]; then
+		echo "${magenta}[Hook]${normal}" "$1" "$2" "$3" "$4"
+	fi
+
+	if [[ -f "$ev_scripts_folder""$1"   ]]; then
+		cd "$ev_scripts_folder" || __ev__error "Could not change directory."
+		script_type="$(head -n 1 "$1")"
+		case "$script_type" in
+			*bash*)
+				bash "$1" "$2" "$3" "$4"
+			;;
+			*php*)
+				php "$1" "$2" "$3" "$4"
+			;;
+			*python*)
+				python "$1" "$2" "$3" "$4"
+			;;
+			*node*)
+				node "$1" "$2" "$3" "$4"
+			;;
+			*ruby*)
+				ruby "$1" "$2" "$3" "$4"
+			;;
+			*)
+				__ev__error "Could not parse file hooked into $1"
+			;;
+		esac
+	fi
+}
+
+__ev__create_site() {
+	# Move to VVV directory
+	cd $path
+
+	__ev__info "Answer the following questions to create a new site"
+	__ev__info "==================================================="
+	__ev__prompt "Site Name" 
+	read -r site_name
+
+	# # Check to see if site exists in vvv-custom.yml
+	# if [ grep -q SomeString "$File"; then ]; then
+		
+	# 	unset site
+	# # Check to see if site exists in local files
+	# elif [ -d "$path/$sites_folder/$site" ]; then
+	# 	__ev__warning "Directory $path/$sites_folder/$site already exists. Existing vvv configuration files will be overwritten."
+	# fi
+
+	__ev__prompt "Domain (leave blank for .test)"
+	read -r domain
+
+	__ev__prompt "Repo (leave blank for basic)"
+	read -r repo
 
 	if [ -z $domain]; then 
 		domain="test"
@@ -121,22 +334,106 @@ __ev__create() {
 }
 
 __ev__remove_site() {
-	read -e -r -p "Site to remove (without the TLD):" site_name
+	__ev__prompt "Site to delete (without the TLD/.test):"
+	read -r site_name
+	__ev__prompt "Are you sure you want to delete $site_name? (this will only delete the vvv configuration) [y/n]:"
+	read -r site_name deletion_confirmation
+	__ev__prompt "Do you want to delete your local site files as well? [y/N]:"
+	read -r delete_local_site_files
 
-	# Remove local
-	rm -r "/www/"site_name
+	if [[ $deletion_confirmation == "y" ]]; then
+		# Move to vvv directory
+		__ev__get_vvv_path
+		cd $path
 
-	# Remove from vvv-custom.yml
+		# Make backup of vvv-custom.yml
+		cp vvv-custom.yml vvv-custom.backup
+		__ev__info "Backed up vvv-custom.yml to vvv-custom.backup"
 
+		# Remove from vvv-custom.yml
+		awk -v site="$site_name" 'BEGIN{ print_flag=1 } 
+			{
+		    if( $0 ~ site ) {
+		      print_flag=0;
+		      next
+		    } 
+		    if( $0 ~ /^  [a-zA-Z0-9]+:$/ || /^[a-zA-Z0-9]+:$/) {
+		      print_flag=1;   
+		    } 
+		    if ( print_flag == 1 ) 
+		      print $0
+			} ' vvv-custom.yml > vvv-custom.tmp
 
-	# Remove from /etc/nginx/custom-sites
+		mv vvv-custom.tmp vvv-custom.yml
+
+		if [[ $delete_local_site_files == "y" ]]; then
+			rm -r "~vagrant-local/www/"$site_name
+		else
+			__ev__info "NOTE: EV did not delete your local site files. You will need to delete those by hand if you wish to do so."
+		fi
+
+		# Remove from /etc/nginx/custom-sites (vagrant realod --provision)
+		vagrant reload --provision
+		__ev__success "$site_name has been deleted."
+
+	elif [[ $1 == "n" ]]; then
+		__ev__error "Deletion aborted."
+	else 
+		__ev__error "Command $1 not recongnized. Aborting deletion. Please try again if you wish to proceed."
+	fi
 }
 
+# __ev__list_sites() {
+# 	__ev__clean_up
+# 	echo $(grep -c "hosts:" vvv-custom.yml)" sites found"
+# 	echo "Site List:"
+# 	awk '/hosts:/{getline;print;}' vvv-custom.yml | sort
+# }
+
 __ev__list_sites() {
-	__ev__clean_up
-	echo $(grep -c "hosts:" vvv-custom.yml)" sites found"
-	echo "Site List:"
-	awk '/hosts:/{getline;print;}' vvv-custom.yml | sort
+	cd "$path"/"$sites_folder" || __ev__error "Could not change directory."
+	__ev__hook "pre_list_sites"
+	find . -maxdepth 2 -mindepth 1 -type d -print0 | while IFS= read -r -d '' filename; do
+		filename=${filename:2}
+		if [[ $filename != 'default' && $filename != 'phpcs' && $filename != 'wp-cli' ]]; then
+			if [[ $filename = 'wordpress-default' || $filename = 'wordpress-develop' || $filename = 'wordpress-trunk' ]]; then
+				__ev__hook "pre_list_site_$filename"
+				__ev__hook "list_site" "$filename"
+				if [[ $filename = 'wordpress-default' ]]; then
+					url=local.wordpress.dev
+				elif [[ $filename = 'wordpress-develop' ]]; then
+					url=src.wordpress-develop.dev
+				elif [[ $filename = 'wordpress-trunk' ]]; then
+					url=local.wordpress-trunk.dev
+				fi
+
+				if [[ ! $clean = "true" ]]; then
+					printf "	* %-30s %s %s\n" "${green}$filename${normal}" "${yellow}( $url )${normal}" "${cyan}[VVV default]${normal}"
+					__ev__hook "post_list_site_$filename"
+				fi
+			else
+				if [[ -f "$path"/"$sites_folder"/"$filename"/vvv-hosts ]]; then
+					__ev__hook "pre_list_site_$filename"
+					__ev__hook "list_site" "$filename"
+					__ev__hook "list_custom_site" "$filename"
+					url=$(<"$path"/"$sites_folder"/"$filename"/vvv-hosts)
+					url=$(echo "$url" | sed -e 's/#.*$//' -e '/^$/d')
+					urls=$(echo "$url" | wc -l)
+					if (( "$urls" > 1 )); then
+						url_seq=$(seq 1 "$urls")
+						dashes=($( for _ in $url_seq; do echo '-'; done ))
+						url="$(echo "$url" | paste -d ' ' "${dashes[@]}" )"
+					fi
+					if [[ ! $clean = "true" ]]; then
+						printf "	* %-30s %s\n" "${green}$filename${normal}" "${yellow}( $url )${normal}"
+						__ev__hook "post_list_site_$filename"
+					fi
+				fi
+			fi
+		fi
+	done
+	__ev__hook "post_list_sites"
+	exit
 }
 
 __ev__clean_up() {
@@ -146,28 +443,173 @@ __ev__clean_up() {
 }
 
 __ev__parse_args() {
-	if [[ $1 == "help" ]] || [[ $1 == "h" ]] || [[ $1 == "--help" ]] || [[ $1 == "--h" ]]; then
-	 	__ev__help
-	fi
-	if [[ $1 == "about" ]] || [[ $1 == "--about" ]]; then
-	 	__ev__about
-	fi
-  if [[ $1 == "create" ]]; then
-  	__ev__create
+  if [ ! -z "$list" ]; then
+  	__ev__list_sites
+ 	fi
+  if [ ! -z "$create" ]; then
+  	__ev__create_site
   fi
-  if [[ $1 == "remove" ]]; then
+  if [ ! -z "$remove" ]; then
   	__ev__remove_site
-  fi
-  if [[ $1 == "list" ]]; then
-   	__ev__list_sites
-  fi
-  if [[ $1 == "clean" ]]; then
-   	__ev__clean_up
   fi
 }
 
+__ev__check_args() {
+	while [ ! -z "$1" ]; do
+		case "$1" in
+			-h|--help|help|h|what)
+				local help=0
+				shift
+				;;
+			-p|--path)
+				__ev__argument_expected "$1" "$2"
+				path=$2
+				shift 2
+				;;
+			-d|--domain)
+				__ev__argument_expected "$1" "$2"
+				domain=$2
+				shift 2
+				;;
+			-n|--name)
+				__ev__argument_expected "$1" "$2"
+				site=$2
+				shift 2
+				;;
+			-wv|--wv|--wp-version|--wp_version|--wpversion)
+				__ev__argument_expected "$1" "$2"
+				version=$2
+				shift 2
+				;;
+			--username)
+				__ev__argument_expected "$1" "$2"
+				username=$2
+				shift 2
+				;;
+			--password)
+				__ev__argument_expected "$1" "$2"
+				password=$2
+				shift 2
+				;;
+			--email)
+				__ev__argument_expected "$1" "$2"
+				email=$2
+				shift 2
+				;;
+			--git-repo|--git_repo|--gitrepo|-gr)
+				__ev__argument_expected "$1" "$2"
+				git_repo=$2
+				shift 2
+				;;
+			-m|--multi-site|--multi_site|--multisite)
+				__ev__argument_expected "$1" "$2"
+				multisite=y
+				ms_type=$2
+				shift 2
+				;;
+			--username)
+				__ev__argument_expected "$1" "$2"
+				username=$2
+				shift 2
+				;;
+			--password)
+				__ev__argument_expected "$1" "$2"
+				password=$2
+				shift 2
+				;;
+			--destination)
+				__ev__argument_expected "$1" "$2"
+				destination=$2
+				shift 2
+				;;
+			-v|v|--vagrant|vagrant)
+				__ev__argument_expected "$1" "$2"
+				__ev__get_vvv_path
+				cd "$path" || __ev__error "Could not change directory."
+				exec vagrant "${@:2}"
+				exit
+				shift 2
+				;;
+			-db|--database)
+				__ev__argument_expected "$1" "$2"
+				db_import=$2
+				shift 2
+				;;
+			-r|-rm|--rm|rm|--remove|remove|--delete|delete|--teardown|teardown)
+				remove="true"
+				shift
+				site="$1"
+				shift
+				;;
+			-l|--list|list|-s|--show|show)
+				list="true"
+				shift
+				;;
+			-c|--create|create|-n|--new|new|-m|--make|make)
+				create="true"
+				shift
+				;;
+			-x|--debug)
+				wp_debug="y"
+				shift
+				;;
+			--version|-v)
+				__ev__version
+				shift
+				;;
+			-sc|--sc|--sample-content|--sample_content|--samplecontent)
+				placeholder_content="y"
+				shift
+				;;
+			-rd|--rd|--remove-defaults)
+				remove_defaults="y"
+				shift
+				;;
+			--prefix|--db-prefix|-dbp)
+				__ev__argument_expected "$1" "$2"
+				db_prefix=$2
+				shift 2
+				;;
+			--language|--locale|--lang|-lang)
+				__ev__argument_expected "$1" "$2"
+				db_lang=$2
+				shift 2
+				;;
+			--about|about)
+				__ev__about
+				exit
+				shift
+				;;
+			--blank)
+				no_wp="true"
+				shift
+				;;
+			--blank-with-db)
+				no_wp="true"
+				no_wp_with_db="true"
+				shift
+				;;
+			*)
+				__ev__fail "Unknown option $1"
+				shift
+				;;
+		esac
+	done
+
+	if [ ! -z $help ]; then
+		__ev__help $help
+	fi
+
+	__ev__get_vvv_path
+	__ev__parse_args
+	exit 0
+}
+
 __ev__main() {
-	__ev__parse_args "$@"
+	no_wp="false"
+	no_wp_with_db="false"
+	sites_folder="www"
+	__ev__check_args "$@"
 }
 
 if [[ "${BASH_SOURCE[0]}" = "${0}" ]]; then
