@@ -42,11 +42,11 @@ Otherwise, clone this repository and edit your `$PATH` to include the `ev` core 
 - Allow directory to be forced
 - Add arguments to site creation
 - Automatically Port from VV
---debug-ev 			            Outputs all debugging info needed for bug reporting
---force-path, -fp 		      Override ev auto-VVV locating
---force-sites-folder, -fsf 	Override sites folder directory locating
---use_defaults		          Accept all default options and skip the wizard
-make listing sites show if it's in vvv-custom.yml (green if good red if not)
-make command to backup custom-vvv.yml yourself
+- --debug-ev 			            Outputs all debugging info needed for bug reporting
+- --force-path, -fp 		      Override ev auto-VVV locating
+- --force-sites-folder, -fsf 	Override sites folder directory locating
+- --use_defaults		          Accept all default options and skip the wizard
+- make listing sites show if it's in vvv-custom.yml (green if good red if not)
+- make command to backup custom-vvv.yml yourself
 
 
