@@ -11,10 +11,10 @@ Another goal of EV is to make porting from using VV extremely easy. This is some
 
 - [Installation](#installation)
   - [OS X Installation](#os-x-installation)
-  - 
-- [TODO](#TODO)
   - [Homebrew](#homebrew)
   - [Linux Installation](#linux-installation)
+- [TODO](#TODO)
+
 
 ## Installation
 
@@ -22,7 +22,7 @@ Another goal of EV is to make porting from using VV extremely easy. This is some
 
 If you have [Homebrew](http://brew.sh/) installed, use:
 
-	$ brew install bradp/vv/vv
+	$ brew install michaelheathjr/ev/ev
 
 Otherwise, clone this repository and edit your `$PATH` to include the `ev` core file:
 
@@ -34,15 +34,19 @@ Otherwise, clone this repository and edit your `$PATH` to include the `ev` core 
 
 ### Linux Installation
 
-## TODO
-- Finish README
-- Dynamically find path instead of using ~/vagrant-local
-- Allow to be used child directories
-- Allow removal of sites
-- List sites command
-- No WP site setup
-- WP-multi-site setup
-- Add multiple sites at once
-- Port from VV
+# TODO
+# - allow to be used child directories
+# - no wp site setup
+# - wp-multi-site setup
+# - Add multiple sites at once
+# - Allow directory to be forced
+# - Add arguments to site creation
+# - Automatically Port from VV
+# --debug-ev 			            Outputs all debugging info needed for bug reporting
+# --force-path, -fp 		      Override ev auto-VVV locating
+# --force-sites-folder, -fsf 	Override sites folder directory locating
+# --use_defaults		          Accept all default options and skip the wizard
+# make listing sites show if it's in vvv-custom.yml (green if good red if not)
+# make command to backup custom-vvv.yml yourself
 
 
