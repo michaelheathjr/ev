@@ -13,6 +13,7 @@ Another goal of EV is to make porting from using VV extremely easy. This is some
   - [OS X Installation](#os-x-installation)
   - [Homebrew](#homebrew)
   - [Linux Installation](#linux-installation)
+- [Commands](#commands)
 - [TODO](#TODO)
 
 
@@ -33,6 +34,8 @@ Otherwise, clone this repository and edit your `$PATH` to include the `ev` core 
 ### Homebrew
 
 ### Linux Installation
+
+## Commands
 
 ## TODO
 - allow to be used child directories
